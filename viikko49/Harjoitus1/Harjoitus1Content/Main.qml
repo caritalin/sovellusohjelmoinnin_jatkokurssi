@@ -5,16 +5,17 @@ ApplicationWindow {
     visible: true
     width: 640
     height: 480
-    title: "Sääsovellus"
+    title: "Harjoitus1"
 
     property string cityName: "Helsinki"
-    property int temperature: 5
+    property int temperature: 0
+    property string weatherIcon: ""
+    property string errorMessage: ""
 
     Rectangle {
         width: parent.width
         height: parent.height
 
-        // Gradientin värit riippuvat lämpötilasta
         gradient: Gradient {
             GradientStop {
                 position: 0.0
@@ -32,36 +33,72 @@ ApplicationWindow {
 
             Row {
                 spacing: 10
+
                 Text {
                     id: cityText
                     text: cityName + ": " + temperature + "°C"
                     font.pixelSize: 24
                     color: "white"
-
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            cityName = (cityName === "Helsinki") ? "Tampere" : "Helsinki"
-                            temperature = (cityName === "Helsinki") ? 5 : -1
-                            cityText.color = cityText.color === "white" ? "yellow" : "white"
-                        }
-                    }
                 }
 
-                // Ilmansuunnan ja sään mukaan vaihteleva kuvake
                 Image {
-                    source: temperature < 0 ? "snowy.png" : (temperature > 30 ? "sunny.png" : "cloudy.png")
+                    source: "https://openweathermap.org/img/wn/" + weatherIcon + "@2x.png"
                     width: 50
                     height: 50
                 }
             }
 
-            // Lisäkomponentteja, jotka voi halutessaan lisätä
             Text {
                 text: "Terve! Tämä on sääsovellus."
                 font.pixelSize: 16
                 color: "white"
             }
+
+            Text {
+                text: errorMessage
+                font.pixelSize: 16
+                color: "red"
+                visible: errorMessage !== ""
+            }
+
+            Button {
+                text: "Päivitä sää"
+                onClicked: fetchWeather()
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+
+            Button {
+                text: "Vaihda kaupunki"
+                onClicked: changeCity()
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
         }
     }
+
+    function fetchWeather() {
+        var apiKey = "a240e2ff1c9c0d936c91e2a04f73beab";
+        var url = "https://api.openweathermap.org/data/2.5/weather?q=" + cityName + "&units=metric&appid=" + apiKey;
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", url);
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                var response = JSON.parse(xhr.responseText);
+                temperature = response.main.temp;
+                weatherIcon = response.weather[0].icon;
+                errorMessage = "";  // Tyhjennä virheilmoitus, jos säädata löytyy
+            } else if (xhr.readyState === 4) {
+                errorMessage = "Virhe säädatan hakemisessa.";
+            }
+        };
+        xhr.send();
+    }
+
+    function changeCity() {
+        // Vaihdetaan kaupungin nimi (Helsinki ↔ Tampere)
+        cityName = (cityName === "Helsinki") ? "Tampere" : "Helsinki";
+        fetchWeather();  // Haetaan uuden kaupungin sää
+    }
+
+    Component.onCompleted: fetchWeather()  // Alustava säätiedon haku
 }
