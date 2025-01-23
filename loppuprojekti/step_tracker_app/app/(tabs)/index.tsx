@@ -10,6 +10,7 @@ import {
     Image,
     Alert,
     Dimensions,
+    Modal,
 } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -29,6 +30,8 @@ const STORAGE_KEY = '@step_goals';
 interface Goal {
     stepGoal: number;
     completed: boolean;
+    date?: string; // Päivämäärä, jolloin merkintä on tehty
+    inputSteps?: string; // Jos askelmäärä on syötetty, se tallennetaan tässä
 }
 
 export default function App() {
@@ -39,6 +42,8 @@ export default function App() {
             completed: false,
         }))
     );
+    const [modalVisible, setModalVisible] = useState<boolean>(false);
+    const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
 
     useEffect(() => {
         loadGoals();
@@ -80,11 +85,12 @@ export default function App() {
         if (stepValue >= 1000 && stepValue <= 100000) {
             // Pyöristä alaspäin lähimpään tuhanteen
             const roundedStepValue = Math.min(Math.floor(stepValue / 1000) * 1000, 31000);
+            const date = new Date().toISOString().split('T')[0]; // Hanki nykyinen päivämäärä
 
             setGoals((prevGoals) =>
                 prevGoals.map((goal) =>
                     goal.stepGoal === roundedStepValue
-                        ? { ...goal, completed: true }
+                        ? { ...goal, completed: true, date, inputSteps: steps }
                         : goal
                 )
             );
@@ -98,9 +104,27 @@ export default function App() {
     const handleRemoveStep = (stepGoal: number) => {
         setGoals((prevGoals) =>
             prevGoals.map((goal) =>
-                goal.stepGoal === stepGoal ? { ...goal, completed: false } : goal
+                goal.stepGoal === stepGoal ? { ...goal, completed: false, date: undefined, inputSteps: undefined } : goal
             )
         );
+    };
+
+    // Merkitse laatikko suoritetuksi tai ei-suoritetuksi
+    const handleToggleStep = (stepGoal: number) => {
+        const date = new Date().toISOString().split('T')[0]; // Hanki nykyinen päivämäärä
+        setGoals((prevGoals) =>
+            prevGoals.map((goal) =>
+                goal.stepGoal === stepGoal
+                    ? { ...goal, completed: !goal.completed, date: !goal.completed ? date : undefined }
+                    : goal
+            )
+        );
+    };
+
+    // Näytä tiedot modalissa
+    const handleShowDetails = (goal: Goal) => {
+        setSelectedGoal(goal);
+        setModalVisible(true);
     };
 
     // Poista kaikki suoritukset ja tyhjennä AsyncStorage
@@ -108,7 +132,7 @@ export default function App() {
         try {
             await AsyncStorage.removeItem(STORAGE_KEY);
             setGoals((prevGoals) =>
-                prevGoals.map((goal) => ({ ...goal, completed: false }))
+                prevGoals.map((goal) => ({ ...goal, completed: false, date: undefined, inputSteps: undefined }))
             );
         } catch (error) {
             console.error('Failed to clear goals:', error);
@@ -135,13 +159,14 @@ export default function App() {
             <TextInput
                 style={styles.input}
                 placeholder="Syötä askelmäärä (esim. 1000)"
+                placeholderTextColor="#aaa"
                 keyboardType="numeric"
                 value={steps}
                 onChangeText={(text) => setSteps(text)}
             />
 
             {/* Lisää-painike */}
-            <Button title="Merkitse suoritetuksi" onPress={handleAddStep} />
+            <Button title="Merkitse suoritetuksi" onPress={handleAddStep} color="#4caf50" />
 
             {/* Askeltavoitelistaus */}
             <FlatList
@@ -149,7 +174,8 @@ export default function App() {
                 numColumns={numColumns} // Dynaamisesti lasketaan sarakkeiden määrä
                 keyExtractor={(item) => item.stepGoal.toString()}
                 renderItem={({ item }) => (
-                    <View
+                    <TouchableOpacity
+                        onPress={() => handleShowDetails(item)}
                         style={[
                             styles.goalItem,
                             {
@@ -172,13 +198,41 @@ export default function App() {
                                 />
                             </TouchableOpacity>
                         )}
-                    </View>
+                    </TouchableOpacity>
                 )}
             />
             {/* Poista kaikki suoritukset -painike */}
             <TouchableOpacity style={styles.clearButton} onPress={handleRemoveAllSteps}>
                 <Text style={styles.clearButtonText}>Tyhjennä</Text>
             </TouchableOpacity>
+
+            {/* Modal yksityiskohtaisia tietoja varten */}
+            <Modal
+                animationType="slide"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => {
+                    setModalVisible(!modalVisible);
+                }}
+            >
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalView}>
+                        <Text style={styles.modalTitle}>Askelmäärän tiedot</Text>
+                        {selectedGoal && (
+                            <>
+                                <Text style={styles.modalText}>Askelmäärä: {selectedGoal.inputSteps ?? selectedGoal.stepGoal}</Text>
+                                <Text style={styles.modalText}>Päivämäärä: {selectedGoal.date}</Text>
+                            </>
+                        )}
+                        <TouchableOpacity
+                            style={styles.closeButton}
+                            onPress={() => setModalVisible(!modalVisible)}
+                        >
+                            <Text style={styles.closeButtonText}>Sulje</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -187,25 +241,28 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 20,
-        backgroundColor: "#f5f5f5",
+        backgroundColor: "#121212",
     },
     title: {
         fontSize: 24,
         fontWeight: "bold",
         marginBottom: 20,
         textAlign: "center",
+        color: "#fff",
     },
     input: {
         borderWidth: 1,
-        borderColor: "#ccc",
+        borderColor: "#333",
         borderRadius: 5,
         padding: 10,
         marginBottom: 10,
         fontSize: 16,
+        color: "#fff",
+        backgroundColor: "#1e1e1e",
     },
     progressContainer: {
         height: 20,
-        backgroundColor: "#e0e0e0",
+        backgroundColor: "#333",
         borderRadius: 10,
         overflow: "hidden",
         marginBottom: 10,
@@ -218,12 +275,13 @@ const styles = StyleSheet.create({
         fontSize: 16,
         textAlign: "center",
         marginBottom: 20,
+        color: "#fff",
     },
     goalItem: {
         borderWidth: 1,
-        borderColor: "#ddd",
+        borderColor: "#333",
         borderRadius: 10,
-        backgroundColor: "#fff",
+        backgroundColor: "#1e1e1e",
         alignItems: "center",
         justifyContent: "space-between",
         padding: 10,
@@ -233,9 +291,10 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: "bold",
         textAlign: "center",
+        color: "#fff",
     },
     completedGoal: {
-        backgroundColor: "#c8e6c9",
+        backgroundColor: "#388e3c",
     },
     trashButton: {
         marginTop: 5,
@@ -244,6 +303,7 @@ const styles = StyleSheet.create({
     trashIcon: {
         width: 24,
         height: 24,
+        tintColor: "#fff",
     },
     clearButton: {
         backgroundColor: "#f44336",
@@ -255,5 +315,38 @@ const styles = StyleSheet.create({
         color: "#fff",
         fontSize: 18,
         textAlign: "center",
+    },
+    modalContainer: {
+        flex: 1,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "rgba(0,0,0,0.5)",
+    },
+    modalView: {
+        width: "80%",
+        backgroundColor: "#1e1e1e",
+        borderRadius: 10,
+        padding: 20,
+        alignItems: "center",
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: "bold",
+        marginBottom: 15,
+        color: "#fff",
+    },
+    modalText: {
+        fontSize: 16,
+        color: "#fff",
+        marginBottom: 10,
+    },
+    closeButton: {
+        backgroundColor: "#4caf50",
+        padding: 10,
+        borderRadius: 5,
+    },
+    closeButtonText: {
+        color: "#fff",
+        fontSize: 16,
     },
 });
