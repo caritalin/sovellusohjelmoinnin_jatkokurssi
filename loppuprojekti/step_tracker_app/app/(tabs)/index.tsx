@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
     StyleSheet,
     View,
@@ -11,6 +11,7 @@ import {
     Alert,
     Dimensions,
 } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Hae näytön mitat
 const { width, height } = Dimensions.get("window");
@@ -23,14 +24,48 @@ const SMALL_SCREEN_THRESHOLD = 600; // Rajapyykki pienen ja suuren näytön väl
 const SMALL_SCREEN_ITEM_SIZE = 120; // Palkin koko pienellä näytöllä
 const LARGE_SCREEN_ITEM_SIZE = 150; // Palkin koko suurella näytöllä
 
+const STORAGE_KEY = '@step_goals';
+
+interface Goal {
+    stepGoal: number;
+    completed: boolean;
+}
+
 export default function App() {
-    const [steps, setSteps] = useState("");
-    const [goals, setGoals] = useState(
-        Array.from({ length: 30 }, (_, i) => ({
-            stepGoal: (i + 1) * 1000, // 1000 -> 30000
+    const [steps, setSteps] = useState<string>("");
+    const [goals, setGoals] = useState<Goal[]>(
+        Array.from({ length: 31 }, (_, i) => ({
+            stepGoal: (i + 1) * 1000, // 1000 -> 31000
             completed: false,
         }))
     );
+
+    useEffect(() => {
+        loadGoals();
+    }, []);
+
+    useEffect(() => {
+        saveGoals();
+    }, [goals]);
+
+    const loadGoals = async () => {
+        try {
+            const savedGoals = await AsyncStorage.getItem(STORAGE_KEY);
+            if (savedGoals !== null) {
+                setGoals(JSON.parse(savedGoals));
+            }
+        } catch (error) {
+            console.error('Failed to load goals:', error);
+        }
+    };
+
+    const saveGoals = async () => {
+        try {
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(goals));
+        } catch (error) {
+            console.error('Failed to save goals:', error);
+        }
+    };
 
     // Päätä näytön asettelu koon perusteella
     const isSmallScreen = width < SMALL_SCREEN_THRESHOLD;
@@ -42,9 +77,9 @@ export default function App() {
         const stepValue = parseInt(steps);
 
         // Tarkista, että syöte on numero ja se on vähintään 1000
-        if (stepValue >= 1000 && stepValue <= 30000) {
+        if (stepValue >= 1000 && stepValue <= 100000) {
             // Pyöristä alaspäin lähimpään tuhanteen
-            const roundedStepValue = Math.floor(stepValue / 1000) * 1000;
+            const roundedStepValue = Math.min(Math.floor(stepValue / 1000) * 1000, 31000);
 
             setGoals((prevGoals) =>
                 prevGoals.map((goal) =>
@@ -55,10 +90,9 @@ export default function App() {
             );
             setSteps(""); // Tyhjennä syötekenttä
         } else {
-            alert("Syötä validi askelmäärä (vähintään 1000 ja korkeintaan 30000).");
+            Alert.alert("Virhe!", 'Syötä validi askelmäärä (vähintään 1000 ja korkeintaan 100000).');
         }
     };
-
 
     // Poista suoritus askeltavoitteesta
     const handleRemoveStep = (stepGoal: number) => {
@@ -69,20 +103,16 @@ export default function App() {
         );
     };
 
-    // Poista kaikki suoritukset
-    const handleRemoveAllSteps = () => {
-        Alert.alert("Varmistus", "Haluatko varmasti tyhjentää suoritukset?", [
-            { text: "Peruuta", style: "cancel" },
-            {
-                text: "Tyhjennä",
-                style: "destructive",
-                onPress: () => {
-                    setGoals((prevGoals) =>
-                        prevGoals.map((goal) => ({ ...goal, completed: false }))
-                    );
-                },
-            },
-        ]);
+    // Poista kaikki suoritukset ja tyhjennä AsyncStorage
+    const handleRemoveAllSteps = async () => {
+        try {
+            await AsyncStorage.removeItem(STORAGE_KEY);
+            setGoals((prevGoals) =>
+                prevGoals.map((goal) => ({ ...goal, completed: false }))
+            );
+        } catch (error) {
+            console.error('Failed to clear goals:', error);
+        }
     };
 
     // Laske suoritetut tavoitteet
@@ -145,7 +175,6 @@ export default function App() {
                     </View>
                 )}
             />
-
             {/* Poista kaikki suoritukset -painike */}
             <TouchableOpacity style={styles.clearButton} onPress={handleRemoveAllSteps}>
                 <Text style={styles.clearButtonText}>Tyhjennä</Text>
@@ -198,6 +227,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "space-between",
         padding: 10,
+        flex: 1,
     },
     goalText: {
         fontSize: 18,
@@ -209,6 +239,7 @@ const styles = StyleSheet.create({
     },
     trashButton: {
         marginTop: 5,
+        marginRight: 5,
     },
     trashIcon: {
         width: 24,
