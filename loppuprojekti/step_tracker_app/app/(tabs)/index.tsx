@@ -222,6 +222,17 @@ export default function App() {
                             <>
                                 <Text style={styles.modalText}>Askelmäärä: {selectedGoal.inputSteps ?? selectedGoal.stepGoal}</Text>
                                 <Text style={styles.modalText}>Päivämäärä: {selectedGoal.date}</Text>
+                                <TouchableOpacity
+                                    style={styles.toggleButton}
+                                    onPress={() => {
+                                        handleToggleStep(selectedGoal.stepGoal);
+                                        setModalVisible(false);
+                                    }}
+                                >
+                                    <Text style={styles.toggleButtonText}>
+                                        {selectedGoal.completed ? 'Poista suoritus' : 'Merkitse suoritetuksi'}
+                                    </Text>
+                                </TouchableOpacity>
                             </>
                         )}
                         <TouchableOpacity
@@ -339,6 +350,16 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: "#fff",
         marginBottom: 10,
+    },
+    toggleButton: {
+        backgroundColor: "#4caf50",
+        padding: 10,
+        borderRadius: 5,
+        marginBottom: 10,
+    },
+    toggleButtonText: {
+        color: "#fff",
+        fontSize: 16,
     },
     closeButton: {
         backgroundColor: "#4caf50",
