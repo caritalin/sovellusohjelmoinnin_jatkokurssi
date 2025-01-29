@@ -11,18 +11,20 @@ import {
     Alert,
     Dimensions,
     Modal,
+    Platform,
 } from "react-native";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Hae näytön mitat
-const { width, height } = Dimensions.get("window");
+const { width } = Dimensions.get("window");
 
 // Vakioarvot palkkien koon ja marginaalien laskemiseen
 const ITEM_MARGIN = 10; // Palkkien välimatka
 
 // Näytön kokoon perustuvat rajoitukset
 const SMALL_SCREEN_THRESHOLD = 600; // Rajapyykki pienen ja suuren näytön välillä
-const NUM_COLUMNS_SMALL_SCREEN = 7; // Kiinteä sarakkeiden määrä pienellä näytöllä
+const NUM_COLUMNS_SMALL_SCREEN = 4; // Kiinteä sarakkeiden määrä pienellä näytöllä
+const NUM_COLUMNS_LARGE_SCREEN = 7; // Kiinteä sarakkeiden määrä suurella näytöllä
 
 const STORAGE_KEY = '@step_goals';
 
@@ -73,8 +75,10 @@ export default function App() {
 
     // Päätä näytön asettelu koon perusteella
     const isSmallScreen = width < SMALL_SCREEN_THRESHOLD;
-    const ITEM_SIZE = (width - ITEM_MARGIN * (NUM_COLUMNS_SMALL_SCREEN + 1)) / NUM_COLUMNS_SMALL_SCREEN;
-    const numColumns = isSmallScreen ? NUM_COLUMNS_SMALL_SCREEN : Math.floor(width / (ITEM_SIZE + ITEM_MARGIN * 2));
+    const ITEM_SIZE = isSmallScreen
+        ? (width - ITEM_MARGIN * (NUM_COLUMNS_SMALL_SCREEN + 1)) / NUM_COLUMNS_SMALL_SCREEN
+        : (width - ITEM_MARGIN * (NUM_COLUMNS_LARGE_SCREEN + 1)) / NUM_COLUMNS_LARGE_SCREEN;
+    const numColumns = isSmallScreen ? NUM_COLUMNS_SMALL_SCREEN : NUM_COLUMNS_LARGE_SCREEN;
 
     // Lisää tai päivitä suoritettu askeltavoite
     const handleAddStep = () => {
@@ -159,9 +163,11 @@ export default function App() {
                 style={styles.input}
                 placeholder="Syötä askelmäärä (esim. 1000)"
                 placeholderTextColor="#aaa"
-                keyboardType="numeric"
+                keyboardType="numbers-and-punctuation"
                 value={steps}
                 onChangeText={(text) => setSteps(text)}
+                onSubmitEditing={handleAddStep} // Lisää numerot Enter-painikkeella
+                returnKeyType="go" // Näyttää "Enter" -napin mobiililaitteilla
             />
 
             {/* Lisää-painike */}
@@ -185,7 +191,7 @@ export default function App() {
                             item.completed && styles.completedGoal,
                         ]}
                     >
-                        <Text style={styles.goalText}>{item.stepGoal}</Text>
+                        <Text style={[styles.goalText, isSmallScreen && styles.goalTextSmall]}>{item.stepGoal}</Text>
                         {item.completed && (
                             <TouchableOpacity
                                 onPress={() => handleRemoveStep(item.stepGoal)}
@@ -295,22 +301,31 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         backgroundColor: "#1e1e1e",
         alignItems: "center",
-        justifyContent: "space-between",
+        justifyContent: "flex-start",
         padding: 8, // Muutettu pienemmäksi
         flex: 1,
+        position: "relative",
     },
     goalText: {
-        fontSize: 16, // Muutettu pienemmäksi
+        fontSize: 16, // Oletuskoko
         fontWeight: "bold",
         textAlign: "center",
         color: "#fff",
+        marginTop: 5,
+    },
+    goalTextSmall: {
+        fontSize: 12, // Pienennetty koko pienille näytöille
     },
     completedGoal: {
         backgroundColor: "#388e3c",
     },
     trashButton: {
-        marginTop: 5,
-        marginRight: 5,
+        alignItems: "center", // Keskittää roskakori-ikonin
+        justifyContent: "center", // Keskittää roskakori-ikonin
+        width: "100%",
+        height: 30,
+        position: "absolute",
+        bottom: 5,
     },
     trashIcon: {
         width: 20, // Muutettu pienemmäksi
